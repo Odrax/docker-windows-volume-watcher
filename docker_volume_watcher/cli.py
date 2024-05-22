@@ -9,6 +9,7 @@ import pywintypes
 from docker_volume_watcher.container_monitor import ContainerMonitor
 from docker_volume_watcher.container_notifier import NotifierOptions
 
+
 def main():
     """
     Parse command line arguments and start monitoring.
@@ -49,6 +50,7 @@ def main():
         logging.error('Failed to contact Docker daemon. Is it running?', exc_info=True)
 
     monitor.unwatch_all()
+
 
 if __name__ == "__main__":
     main()

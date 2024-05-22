@@ -85,7 +85,7 @@ class ContainerNotifier(object):
         return '%s -> %s:%s' % (self.host_dir, self.container.name, self.container_dir)
 
     def __change_handler(self, event):
-        host_path = event.dest_path if hasattr(event, 'dest_path') else event.src_path
+        host_path = event.dest_path if hasattr(event, 'dest_path') and event.dest_path else event.src_path
 
         # PatternMatchingEventHandler filters events according to src_path.
         # We create extra filtration by dest_path.
@@ -93,7 +93,7 @@ class ContainerNotifier(object):
             logging.info(
                 'Ignoring event in %s since it matches one of exclude_patterns.', host_path)
             return
-
+          
         relative_host_path = relpath(host_path, self.host_dir).replace('\\', '/')
         absolute_path = posixpath.join(self.container_dir, relative_host_path)
         self.notify_debounced(absolute_path)
