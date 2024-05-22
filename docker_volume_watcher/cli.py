@@ -22,9 +22,13 @@ def main():
                         nargs='?', help='pattern of container names to be notified (default: *)')
     parser.add_argument('host_dir_pattern', metavar='HOST_DIR_PATTERN', type=str, default='*',
                         nargs='?', help='pattern of host directories to be monitored (default: *)')
-
+    parser.add_argument("-t", "--touch", help="notify using touch instead of chown if chown is ineffective",
+                        action="store_true")
     parser.add_argument("-v", "--verbose", help="increase output verbosity",
                         action="store_true")
+    parser.add_argument("-i", "--include",
+                        help="include only specific file/directory name patterns patterns",
+                        nargs='+')
     parser.add_argument('-e', '--exclude',
                         help='ignore changes in files/directories matching given patterns',
                         nargs='+')
@@ -38,7 +42,7 @@ def main():
     if args.verbose:
         logging.basicConfig(level=logging.INFO)
 
-    notifier_options = NotifierOptions(args.exclude, args.debounce)
+    notifier_options = NotifierOptions(args.exclude, args.include, args.debounce)
     monitor = ContainerMonitor(args.container_pattern, args.host_dir_pattern, notifier_options)
 
     try:

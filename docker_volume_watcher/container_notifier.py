@@ -19,7 +19,7 @@ class NotifierOptions(object):
     Holds options ContainerNotifier instantiation.
     """
 
-    def __init__(self, exclude_patterns=None, notify_debounce=0):
+    def __init__(self, exclude_patterns=None, include_patterns=None, notify_debounce=0):
         """
         Initialize a new instance of NotifierOptions.
         Args:
@@ -27,8 +27,8 @@ class NotifierOptions(object):
             notify_debounce (float): delay and ignore repeated events for the same file during
                 given interval
         """
-        exclude_patterns = exclude_patterns if exclude_patterns else []
-        self.exclude_patterns = exclude_patterns
+        self.include_patterns = include_patterns if include_patterns else []
+        self.exclude_patterns = exclude_patterns if exclude_patterns else []
         self.notify_debounce = notify_debounce
 
 
@@ -81,17 +81,25 @@ class ContainerNotifier(object):
         self.observer.schedule(event_handler, host_dir, recursive=True)
         self.observer.start()
 
+        # watchlist for touch notify
+        self.watchlist = []
+
     def __str__(self):
         return '%s -> %s:%s' % (self.host_dir, self.container.name, self.container_dir)
 
     def __change_handler(self, event):
         host_path = event.dest_path if hasattr(event, 'dest_path') and event.dest_path else event.src_path
 
-        # PatternMatchingEventHandler filters events according to src_path.
-        # We create extra filtration by dest_path.
-        if any(fnmatch(host_path, exlude) for exlude in self.options.exclude_patterns):
-            logging.info(
-                'Ignoring event in %s since it matches one of exclude_patterns.', host_path)
+        # PatternMatchingEventHandler filters events according to src_path. (doesn't seem to work at all for me)
+
+        # filter out undesired patterns
+        if not any(fnmatch(host_path, include) for include in self.options.include_patterns):
+            logging.info('Ignoring event in %s since it does not match one of include_patterns.', host_path)
+            return
+
+        # reject if excluded pattern found
+        if any(fnmatch(host_path, exclude) for exclude in self.options.exclude_patterns):
+            logging.info('Ignoring event in %s since it matches one of exclude_patterns.', host_path)
             return
           
         relative_host_path = relpath(host_path, self.host_dir).replace('\\', '/')
@@ -111,13 +119,7 @@ class ContainerNotifier(object):
             self.container.name,
             absolute_path)
         try:
-            permissions = self.container.exec_run(
-                ['stat', '-c', '%a', absolute_path], privileged=True)
-            if permissions.exit_code != 0:
-                raise NonZeroExitError(permissions.exit_code)
-            permissions = permissions.output.decode('utf-8').strip()
-            response = self.container.exec_run(
-                ['chmod', permissions, absolute_path], privileged=True)
+            response = self.chmod_notify(absolute_path)
             if response.exit_code != 0:
                 raise NonZeroExitError(response.exit_code)
             if response:
@@ -131,6 +133,19 @@ class ContainerNotifier(object):
             logging.error(
                 'Exec run returned non-zero exit code: %s',
                 exception.exit_code)
+
+    # The original functionality
+    def chmod_notify(self, absolute_path):
+        permissions = self.container.exec_run(['stat', '-c', '%a', absolute_path], privileged=True)
+        if permissions.exit_code != 0:
+            raise NonZeroExitError(permissions.exit_code)
+        permissions = permissions.output.decode('utf-8').strip()
+        return self.container.exec_run(['chmod', permissions, absolute_path], privileged=True)
+
+    # Services as vue-cli don't respond to chmod changes, so we need to get touchy
+    def touch_notify(self, absolute_path):
+        # TODO: implement watchlist to prevent infinite loop
+        return self.container.exec_run(['touch', absolute_path], privileged=True)
 
     def stop(self):
         """

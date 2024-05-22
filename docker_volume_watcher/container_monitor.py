@@ -25,7 +25,7 @@ def docker_bind_to_windows_path(path):
 
     """
     # Check if the path is already in Windows format
-    if re.match(re.compile(r'^[a-zA-Z]:(/|\\\\).*$'), path):
+    if re.match(re.compile(r'^[a-zA-Z]:([/\\]).*$'), path):
         return path
 
     match = re.match(re.compile('^(?:/host_mnt)?/([a-zA-Z])/(.*)$'), path)
